@@ -18,4 +18,6 @@ async function puppInstagramLogin(){
 
 }
 
-module.exports = puppInstagramLogin
+module.exports = {
+    puppInstagramLogin
+}

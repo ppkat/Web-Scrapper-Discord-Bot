@@ -6,6 +6,11 @@ module.exports = {
         .setName('instagram')
         .setDescription('Responde com os dados do perfil passado'),
     async execute(interation) {
-        await instagram.pupinstagramlogin()
+        interation.reply('scrappando...')
+        await instagram.puppInstagramLogin()
+            .then( info => {
+                //console.log(info)
+                interation.reply('informação')
+            })
     }
 }
