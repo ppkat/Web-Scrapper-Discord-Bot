@@ -5,6 +5,8 @@ module.exports = {
     name: 'interactionCreate',
     once: false,
     listen: async (client, interation) => {
+        if(!interation.isCommand()) return;
+        
         //command handling
         client.commands = new Collection()
         const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'))
