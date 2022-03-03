@@ -4,8 +4,8 @@ const fs = require('fs')
 module.exports = {
     name: 'interactionCreate',
     once: false,
-    listen: async (client, interation) => {
-        if(!interation.isCommand()) return;
+    listen: async (client, interaction) => {
+        if(!interaction.isCommand()) return;
         
         //command handling
         client.commands = new Collection()
@@ -16,13 +16,13 @@ module.exports = {
             client.commands.set(command.data.name, command)
         }
 
-        const command = client.commands.get(interation.commandName)
+        const command = client.commands.get(interaction.commandName)
         try {
-            await command.execute(interation)
+            await command.execute(interaction)
         }
         catch (err) {
             console.log(err)
-            await interation.reply({ content: 'Houve um erro ao executar o comando', ephemeral: true })
+            await interaction.reply({ content: 'Houve um erro ao executar o comando', ephemeral: true })
         }
     }
 }

@@ -18,5 +18,8 @@
     "dotenv": "^16.0.0",
     "puppeteer": "^13.3.2",
     "user-instagram": "^3.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }
