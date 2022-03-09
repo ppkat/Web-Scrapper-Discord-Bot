@@ -37,6 +37,6 @@ module.exports = {
         const subcommandName = interaction.options.getSubcommand()
         const subcommandFile = require(`./subcommands/instagram/${subcommandName}`)
 
-        await subcommandFile.execute(interaction, embedResponse)
+        await subcommandFile.execute(interaction)
     }
 }
