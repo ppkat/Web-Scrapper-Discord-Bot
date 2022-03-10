@@ -25,8 +25,7 @@ async function puppInstagram(func) {
     const page = (await browser.pages())[0]
 
     async function checkIfUserExists(user) {
-        let returned = null
-        await page.goto(`https://www.instagram.com/${user}`).then(async res => {
+        let returned = await page.goto(`https://www.instagram.com/${user}`).then(async res => {
             await page.waitForSelector('body')
             const errorBody = page.$('.p-error.dialog-404')
             if(res.status === 404 || errorBody) return false
