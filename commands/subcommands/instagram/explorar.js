@@ -1,4 +1,4 @@
-async function execute(interaction, embedResponse) {
+async function execute(interaction) {
     await interaction.deferReply();
 
     interaction.editReply({ content: 'NÃO?' })

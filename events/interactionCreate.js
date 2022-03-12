@@ -27,11 +27,11 @@ module.exports = {
         }else if (interaction.isSelectMenu()){
             const info = require('../commands/subcommands/instagram/info')
             if(interaction.customId === 'userOptions'){
-                await interaction.deferReply()
+                await interaction.deferUpdate()
 
-                await info.createEmbed(interaction.values.toString()).then(embed => {
-                    interaction.editReply('Aqui as informações de ' + interaction.values.toString())
-                    interaction.channel.send({ embeds: [embed] })
+                await info.createEmbed(interaction.values.toString()).then(async embed => {
+                    await interaction.editReply({ content: 'Aqui as informações de ' + interaction.values.toString(), components: []})
+                    await interaction.channel.send({ embeds: [embed] })
                 })
             }
         }

@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer')
 const instagram = require('user-instagram');
+const ig = require('instagram-scraping')
 require('dotenv').config({ path: '../.env' })
 
 let websocketURL = ''
@@ -23,22 +24,22 @@ async function puppInstagram(func) {
 
     const browser = await puppeteer.connect({ browserWSEndpoint: websocketURL })
     const page = (await browser.pages())[0]
+    await page.goto('https://www.instagram.com/')
 
     async function checkIfUserExists(user) {
         let returned = await page.goto(`https://www.instagram.com/${user}`).then(async res => {
             await page.waitForSelector('body')
-            const errorBody = page.$('.p-error.dialog-404')
+            const errorBody = await page.$('.p-error.dialog-404')
             if(res.status === 404 || errorBody) return false
 
             return true
         })
-
+        await page.goBack()
         return returned
     }
 
     async function searchForUser(user) {
 
-        await page.goto('https://www.instagram.com')
         await page.waitForSelector('[aria-label="Entrada da pesquisa"]')
         await page.type('[aria-label="Entrada da pesquisa"]', user)
         await page.waitForSelector('.fuqBx') //div that contain the search results
@@ -57,7 +58,16 @@ async function puppInstagram(func) {
         return possibleUsersNames
     }
 
-    return func({ checkIfUserExists, searchForUser })
+    async function explore(){
+
+        await page.waitForSelector('[href="/explore/"]')
+        await page.click('[href="/explore/"]')
+
+        const posts = page.$$('')
+
+    }
+
+    return func({ checkIfUserExists, searchForUser, explore })
 }
 
 async function getUserInstagramInfo(user) {
@@ -94,7 +104,10 @@ async function getUserInstagramInfo(user) {
     })
 
     return userData
+}
 
+async function scrappInstagramTag(tag){
+    
 }
 
 module.exports = {
