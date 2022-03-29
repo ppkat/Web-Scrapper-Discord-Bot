@@ -26,6 +26,7 @@ async function puppInstagram(func) {
 
     const browser = await puppeteer.connect({ browserWSEndpoint: websocketURL })
     const page = (await browser.pages())[0]
+    await page.reload()
 
     async function checkIfUserExists(user) {
         let returned = await page.goto(`https://www.instagram.com/${user}`).then(async res => {
@@ -59,61 +60,86 @@ async function puppInstagram(func) {
         return possibleUsersNames
     }
 
-    async function exploreImages() {
+    async function exploreImages(quantity) {
+        quantity = quantity ?? 1
+        quantity = quantity > 10 ? 10 : quantity
+
+        let images = []
+        let postURL = []
 
         await page.waitForSelector('[href="/explore/"]')
         await page.click('[href="/explore/"]')
 
         await page.waitForSelector('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
-        await page.waitForTimeout(1500)
+        await page.waitForTimeout(200)
 
-        const postsJSHandle = await page.$$('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
-        await page.exposeFunction('getImagesSlides', async postIndex => {
+        let postsJSHandle = await page.$$('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
+
+        async function getImagesSlides(postIndex) {
+
+            postsJSHandle = await page.$$('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
             let post = postsJSHandle[postIndex]
-            console.log('getImagesSlides sendo chamada')
-            await page.evaluateHandle( post => post.firstChild.click(), post)
-            console.log('passou do image link')
-            await page.waitForSelector('button[aria-label="Avançar"]').then(async button => await button.click())
-            console.log('passou daq')
 
-            const postImageCollection = await page.$$eval('li.Ckrof', async imagesSlides => {
-                let postImageCollection = []
-                for (let imageSlide of imagesSlides){
-                    console.log('for do getImageSlides')
-                    postImageCollection.push(imageSlide.firstChild.firstChild.firstChild.firstChild.firstChild.src) 
-                }
-                return postImageCollection
-            })
+            await page.evaluateHandle(post => post.firstChild.click(), post) //click on the <a> tag
+            let postURL = page.url()
+            await page.waitForSelector('button[aria-label="Avançar"]')
+
+            let postImageCollectionURLs = []
+            let advanceButtonHandle = await page.$('button[aria-label="Avançar"]')
+            await page.waitForTimeout(200)
+
+            for (i = 0; advanceButtonHandle; i++) {
+
+                postImageCollectionURLs.push(await page.$$eval('li.Ckrof', async (imageSlides, i) => {
+                    const currentImgTagSrc = imageSlides[i == 0 ? 0 : 1].firstChild.firstChild.firstChild.firstChild.firstChild.src ??
+                        imageSlides[i == 0 ? 0 : 1].firstChild.firstChild.firstChild.firstChild.firstChild.firstChild.src
+
+                    return currentImgTagSrc
+                }, i))
+
+                if (!postImageCollectionURLs[i]) postImageCollectionURLs.pop()
+
+                await page.evaluate(advanceButton => advanceButton.click(), advanceButtonHandle)
+                advanceButtonHandle = await page.$('button[aria-label="Avançar"]')
+                await page.waitForTimeout(200)
+            }
+
+            postImageCollectionURLs.push(await page.$$eval('li.Ckrof', async imageSlides => {
+                const currentImgTagSrc = imageSlides[1].firstChild.firstChild.firstChild.firstChild.firstChild.src ??
+                    imageSlides[1].firstChild.firstChild.firstChild.firstChild.firstChild.firstChild.src
+
+                return currentImgTagSrc
+            }))
+
+            if (!postImageCollectionURLs[i]) postImageCollectionURLs.pop()
 
             await page.goBack()
-            console.log('passou do for', postImageCollection)
-            return postImageCollection
-        })
-        const images = await page.$$eval('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW' ,async posts => {
-            let images = []
-            console.log('chegou no eval')
 
-            for ( let i = 0; i < posts.length; i++) {
-                const post = posts[i]
-                console.log('chegou no for')
-                //weather post has a svg on top left corner
-                if (post.firstChild.children[1]) {
-                    console.log('chegou no if que verifica svg')
-                    if (post.firstChild.children[1].firstChild.ariaLabel === 'Carrossel'){
-                        console.log('chegou no if do getImagesSlides')
-                        await getImagesSlides(i).then(imagesSlides => images.push(imagesSlides))
-                    } else {
-                        console.log(post.firstChild.children[1].firstChild.ariaLabel)
-                    }
+            return [postImageCollectionURLs, postURL]
+        }
 
-                } else{ images.push(post.firstChild.firstChild.firstChild.firstChild.src)
-                    console.log('chegou no else')}
+        for (let i = 0; i < postsJSHandle.length && images.length < quantity; i++) {
+            const postHandle = postsJSHandle[i]
+
+            const isImageCollection = await page.evaluate(post => {
+                return post.firstChild.children[1] ? (post.firstChild.children[1].firstChild.ariaLabel === 'Carrossel' ? true : false) : false
+            } ,postHandle)
+            
+            if(isImageCollection){
+                await getImagesSlides(i).then(([imagesSlides, URL]) => {
+                    postURL.push(URL);
+                    if (imagesSlides.length > 0) images.push(imagesSlides)
+                })
             }
-            return images
-        })
+            else{
+                postURL.push(await page.evaluate(post => post.firstChild.href, postHandle))
+                images.push(await page.evaluate(post => post.firstChild.firstChild.firstChild.firstChild.src, postHandle))
+            }
+
+        }
 
         await page.goBack()
-        return images
+        return { images, postURL }
     }
 
     return func({ checkIfUserExists, searchForUser, exploreImages })
@@ -159,11 +185,8 @@ async function scrappInstagramTag(tag) {
 
 }
 
-puppInstagram(async ({ exploreImages, searchForUser }) => {
-    console.log(await exploreImages())
-})
-
 module.exports = {
     puppInstagram,
-    getUserInstagramInfo
+    getUserInstagramInfo,
+    scrappInstagramTag
 }

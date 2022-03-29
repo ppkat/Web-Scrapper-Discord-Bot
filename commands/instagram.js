@@ -20,6 +20,11 @@ module.exports = {
             subcommand
                 .setName('explorar')
                 .setDescription('Pega um post aleatório')
+                .addNumberOption(option =>
+                    option
+                        .setName('quantidade')
+                        .setDescription('quantidade de posts a serem pegos')
+                )
         )
         .addSubcommand(subcommand =>
             subcommand
@@ -28,10 +33,6 @@ module.exports = {
         ),
 
     async execute(interaction) {
-
-        const embedResponse = new MessageEmbed()
-            .setColor('#65496E')
-            .setTimestamp()
 
         //subCommands handling
         const subcommandName = interaction.options.getSubcommand()
