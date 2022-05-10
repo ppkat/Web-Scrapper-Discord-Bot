@@ -30,18 +30,15 @@ async function execute(interaction) {
             .setTitle('Post ' + (index + 1).toString())
             .setURL(postURL[index])
 
-        if (typeof item === 'object') {
-            item.forEach((url, index, arr) => {
-                imagesEmbed
-                    .setImage(arr[0])
-                interaction.channel.send(arr[index + 1])
-            })
-        } else {
-            imagesEmbed.setImage(item)
+        if (typeof item === 'object') { //case the post is a collection
+            imagesEmbed.setImage(item[0])
+            item.forEach((url, index, arr) => index === 0 ? interaction.channel.send({ embeds: [imagesEmbed] }) : interaction.channel.send(arr[index]))
+            return
         }
+        imagesEmbed.setImage(item)
 
         interaction.channel.send({ embeds: [imagesEmbed] })
-    });
+    })
 
     interaction.deleteReply()
 }

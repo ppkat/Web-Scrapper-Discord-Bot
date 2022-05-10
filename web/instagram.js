@@ -71,7 +71,7 @@ async function puppInstagram(func) {
         await page.click('[href="/explore/"]')
 
         await page.waitForSelector('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
-        await page.waitForTimeout(200)
+        await page.waitForTimeout(200) //load posts
 
         let postsJSHandle = await page.$$('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
 
@@ -97,7 +97,7 @@ async function puppInstagram(func) {
                     return currentImgTagSrc
                 }, i))
 
-                if (!postImageCollectionURLs[i]) postImageCollectionURLs.pop()
+                if (!postImageCollectionURLs[i]) postImageCollectionURLs.pop() //case have not an image on the page of post 
 
                 await page.evaluate(advanceButton => advanceButton.click(), advanceButtonHandle)
                 advanceButtonHandle = await page.$('button[aria-label="Avançar"]')
@@ -111,7 +111,7 @@ async function puppInstagram(func) {
                 return currentImgTagSrc
             }))
 
-            if (!postImageCollectionURLs[i]) postImageCollectionURLs.pop()
+            if (!postImageCollectionURLs[postImageCollectionURLs.length - 1]) postImageCollectionURLs.pop()
 
             await page.goBack()
 
@@ -127,8 +127,8 @@ async function puppInstagram(func) {
             
             if(isImageCollection){
                 await getImagesSlides(i).then(([imagesSlides, URL]) => {
-                    postURL.push(URL);
-                    if (imagesSlides.length > 0) images.push(imagesSlides)
+                    
+                    if (imagesSlides.length > 0) images.push(imagesSlides) && postURL.push(URL)
                 })
             }
             else{
