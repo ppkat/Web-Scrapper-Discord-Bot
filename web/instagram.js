@@ -32,7 +32,7 @@ async function puppInstagram(func) {
         let returned = await page.goto(`https://www.instagram.com/${user}`).then(async res => {
             await page.waitForSelector('body')
             const errorBody = await page.$('.p-error.dialog-404')
-            if (res.status === 404 || errorBody) return false
+            if (res.status() === 404 || errorBody) return false
 
             return true
         })
