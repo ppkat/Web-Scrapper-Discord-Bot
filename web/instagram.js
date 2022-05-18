@@ -1,31 +1,40 @@
 const puppeteer = require('puppeteer')
 const instagram = require('user-instagram');
 const ig = require('instagram-scraping')
-require('dotenv').config({ path: '../.env' })
+require('dotenv').config()
 
 let websocketURL = ''
+let isLoggedIn;
 
 async function createBrowserInstance() {
 
     const browser = await puppeteer.launch({ headless: false });
     websocketURL = browser.wsEndpoint()
-    const page = (await browser.pages())[0]
+}
 
-    page.on('console', msg => console.log('browser console: ', msg.text()))
-
-    await page.goto('https://www.instagram.com/');
+async function loginInstagram(email, password, page) {
     await page.waitForSelector('[name="username"]');
-    await page.type('[name="username"]', process.env.LOGIN_EMAIL_INSTAGRAM);
-    await page.type('[type="password"]', process.env.LOGIN_PASSWORD_INSTAGRAM);
+    await page.type('[name="username"]', email);
+    await page.type('[type="password"]', password);
     await page.click('[type="submit"]');
     await page.waitForNavigation();
 }
 
-async function puppInstagram(func) {
-    if (websocketURL === '') await createBrowserInstance()
+async function webScrapInstagram(func) {
+    if (websocketURL === '') {
+        await createBrowserInstance()
+        isLoggedIn = false
+    }
 
     const browser = await puppeteer.connect({ browserWSEndpoint: websocketURL })
-    const page = (await browser.pages())[0]
+    const page = await browser.newPage()
+    page.on('console', msg => console.log('browser console: ', msg.text()))
+    await page.goto('https://www.instagram.com/');
+
+    if (!isLoggedIn) {
+        await loginInstagram(process.env.LOGIN_EMAIL_INSTAGRAM, process.env.LOGIN_PASSWORD_INSTAGRAM, page)
+        isLoggedIn = true
+    }
     await page.reload()
 
     async function checkIfUserExists(user) {
@@ -123,15 +132,15 @@ async function puppInstagram(func) {
 
             const isImageCollection = await page.evaluate(post => {
                 return post.firstChild.children[1] ? (post.firstChild.children[1].firstChild.ariaLabel === 'Carrossel' ? true : false) : false
-            } ,postHandle)
-            
-            if(isImageCollection){
+            }, postHandle)
+
+            if (isImageCollection) {
                 await getImagesSlides(i).then(([imagesSlides, URL]) => {
-                    
+
                     if (imagesSlides.length > 0) images.push(imagesSlides) && postURL.push(URL)
                 })
             }
-            else{
+            else {
                 postURL.push(await page.evaluate(post => post.firstChild.href, postHandle))
                 images.push(await page.evaluate(post => post.firstChild.firstChild.firstChild.firstChild.src, postHandle))
             }
@@ -181,12 +190,51 @@ async function getUserInstagramInfo(user) {
     return userData
 }
 
-async function scrappInstagramTag(tag) {
+async function getFollowers(user, quantity) {
+    if (websocketURL === '') await createBrowserInstance()
+    const browser = await puppeteer.launch({headless: false}) //unfortunally, on login on instagram in one tab, unlog in other. Then it needs other browser
 
+    const gmailPage = await browser.newPage()
+    await gmailPage.goto('https://accounts.google.com/signin')
+
+    await gmailPage.type('[type="email"]', process.env.GMAIL_ACCOUNT)
+    await gmailPage.keyboard.press('Enter')
+    await gmailPage.waitForTimeout(1500)
+    await gmailPage.waitForSelector('[type="password"]')
+    await gmailPage.type('[type="password"]', process.env.GMAIL_PASSWORD)
+    await gmailPage.keyboard.press('Enter')
+    await gmailPage.waitForNavigation()
+
+    async function createAccount(username, page, index) {
+
+        const password = process.env.LOGIN_PASSWORD_INSTAGRAM + index.toString()
+        const fullName = process.env.MINIONS_USERNAME.slice(0, 4) + process.env.MINIONS_USERNAME.slice(5) + index.toString()
+        const email = `${process.env.GMAIL_ACCOUNT.slice(0,-11)}+${index}${process.env.GMAIL_ACCOUNT.slice(-10)}`
+        await page.goto('https://www.instagram.com/accounts/emailsignup/')
+        await page.waitForSelector('[name="emailOrPhone"]')
+        await page.type('[name="emailOrPhone"]', email)
+        await page.type('[name="fullName"]', fullName)
+        await page.type('[name="username"]', username)
+        await page.type('[name="password"]', password)
+        await page.click('[type="submit"]')
+        await page.waitForNavigation()
+    }
+
+    for (i = 0; i < quantity; i++){
+
+        const instagramPage = await browser.newPage()
+        await instagramPage.goto(`https://www.instagram.com/${user}`);
+        
+        const username = `${process.env.MINIONS_USERNAME}${i}`
+        await createAccount(username, instagramPage, i)
+
+        await loginInstagram(user, '123', instagramPage)
+    }
 }
 
+getFollowers('abcdef', 6)
+
 module.exports = {
-    puppInstagram,
+    puppInstagram: webScrapInstagram,
     getUserInstagramInfo,
-    scrappInstagramTag
 }
