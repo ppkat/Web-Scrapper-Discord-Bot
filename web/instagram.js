@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer')
 const instagram = require('user-instagram');
 const ig = require('instagram-scraping')
+const fs = require('fs')
 require('dotenv').config()
 
 let websocketURL = ''
@@ -194,6 +195,8 @@ async function getFollowers(user, quantity) {
     if (websocketURL === '') await createBrowserInstance()
     const browser = await puppeteer.launch({headless: false}) //unfortunally, on login on instagram in one tab, unlog in other. Then it needs other browser
 
+    const JSONAccountsPath = './accounts.json'
+
     const gmailPage = await browser.newPage()
     await gmailPage.goto('https://accounts.google.com/signin')
 
@@ -205,11 +208,21 @@ async function getFollowers(user, quantity) {
     await gmailPage.keyboard.press('Enter')
     await gmailPage.waitForNavigation()
 
+    function storeOnJSON(newData){
+
+        const oldData = fs.readFileSync(JSONAccountsPath)
+        const objectOldData = JSON.parse(oldData)
+
+        const updatadeData = [...objectOldData, ...newData]
+        const stringUpdatadeData = JSON.stringify(updatadeData)
+        fs.writeFileSync(JSONAccountsPath, stringUpdatadeData)
+    }
+
     async function createAccount(username, page, index) {
 
         const password = process.env.LOGIN_PASSWORD_INSTAGRAM + index.toString()
-        const fullName = process.env.MINIONS_USERNAME.slice(0, 4) + process.env.MINIONS_USERNAME.slice(5) + index.toString()
-        const email = `${process.env.GMAIL_ACCOUNT.slice(0,-11)}+${index}${process.env.GMAIL_ACCOUNT.slice(-10)}`
+        const fullName = `${username.slice(0, 4)} ${username.slice(5)}`
+        const email = `${process.env.GMAIL_ACCOUNT.slice(0,-11)}+bot${index}${process.env.GMAIL_ACCOUNT.slice(-10)}`
         await page.goto('https://www.instagram.com/accounts/emailsignup/')
         await page.waitForSelector('[name="emailOrPhone"]')
         await page.type('[name="emailOrPhone"]', email)
@@ -218,6 +231,8 @@ async function getFollowers(user, quantity) {
         await page.type('[name="password"]', password)
         await page.click('[type="submit"]')
         await page.waitForNavigation()
+
+        storeOnJSON({username, id: index.toString()})
     }
 
     for (i = 0; i < quantity; i++){
@@ -225,6 +240,11 @@ async function getFollowers(user, quantity) {
         const instagramPage = await browser.newPage()
         await instagramPage.goto(`https://www.instagram.com/${user}`);
         
+        const accountJSON = fs.readFileSync(JSONAccountsPath)
+        const createdAccounts = JSON.parse(accountJSON)
+        const lastAccountIndex = createdAccounts.length - 1
+        i = lastAccountIndex + 1
+
         const username = `${process.env.MINIONS_USERNAME}${i}`
         await createAccount(username, instagramPage, i)
 
