@@ -16,8 +16,9 @@ async function execute(interaction) {
         interaction.editReply(`Aqui as informações de *${instagramUsernameInputed}*`)
     })
     else {
-        await instagram.puppInstagram(({ searchForUser }) => {
-            searchForUser(instagramUsernameInputed).then(async usersNames => {
+        const serachUserMessage = await instagram.puppInstagram(async ({ searchForUser }) => {
+            const responseMessage = await searchForUser(instagramUsernameInputed).then(async usersNames => {
+                if (usersNames === 'Invalid Username') return await interaction.editReply({ content: 'Além do usuário não existir, não faço idéia de quem você quiz dizer' })
 
                 const row = new MessageActionRow().addComponents(
                     new MessageSelectMenu()
@@ -32,9 +33,22 @@ async function execute(interaction) {
                     }])
                 });
 
-                await interaction.editReply({ content: 'Usuário inexistente. Você quis dizer:', components: [row] })
+                return await interaction.editReply({ content: 'Usuário inexistente. Você quis dizer:', components: [row] })
             })
+
+            return responseMessage
         })
+
+        console.log(serachUserMessage)
+
+        if (interaction.customId === 'userOptions') {
+            await interaction.deferUpdate()
+
+            await info.createEmbed(interaction.values.toString()).then(async embed => {
+                await interaction.editReply({ content: 'Aqui as informações de ' + interaction.values.toString(), components: [] })
+                await interaction.channel.send({ embeds: [embed] })
+            })
+        }
     }
 }
 
@@ -77,15 +91,15 @@ async function createEmbed(instagramUsernameInputed) {
                 { name: 'Informações do negócio', value: '\u200B' },
             )
 
-        if(userData.businessAdressJson && userData.businessAdressJson !== '') embedResponse.addField('Endereço', userData.businessAdressJson)
-        if(userData.businessContactMethod && userData.businessContactMethod !== '') embedResponse.addField('Contato', userData.businessContactMethod)
-        if(userData.businessEmail && userData.businessEmail !== '') embedResponse.addField('Endereço', userData.businessAdressJson)
-        if(userData.businessPhoneNumber && userData.businessPhoneNumber !== '') embedResponse.addField('Telefone', userData.businessPhoneNumber, true)
-        if(userData.businessCategoryName && userData.businessCategoryName !== '') embedResponse.addField('Categoria', userData.businessCategoryName, true)
-        if(userData.categoryEnum && userData.categoryEnum !== '') embedResponse.addField('Numero de categorias', userData.categoryEnum, true)
+        if (userData.businessAdressJson && userData.businessAdressJson !== '') embedResponse.addField('Endereço', userData.businessAdressJson)
+        if (userData.businessContactMethod && userData.businessContactMethod !== '') embedResponse.addField('Contato', userData.businessContactMethod)
+        if (userData.businessEmail && userData.businessEmail !== '') embedResponse.addField('Endereço', userData.businessAdressJson)
+        if (userData.businessPhoneNumber && userData.businessPhoneNumber !== '') embedResponse.addField('Telefone', userData.businessPhoneNumber, true)
+        if (userData.businessCategoryName && userData.businessCategoryName !== '') embedResponse.addField('Categoria', userData.businessCategoryName, true)
+        if (userData.categoryEnum && userData.categoryEnum !== '') embedResponse.addField('Numero de categorias', userData.categoryEnum, true)
     }
 
     return embedResponse
 }
 
-module.exports = { execute, createEmbed }
+module.exports = { execute }

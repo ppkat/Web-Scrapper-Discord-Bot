@@ -1,11 +1,12 @@
 const parentCommand = require('../../instagram.js')
+const { MessageEmbed } = require('discord.js')
 
-async function execute(interaction, embedResponse) {
+async function execute(interaction) {
     await interaction.deferReply();
 
-    const subcommands =  parentCommand.data.options
+    const subcommands = parentCommand.data.options
 
-    embedResponse
+    const embedResponse = new MessageEmbed()
         .setTitle('Comandos Instagram')
         .setDescription('Comandos relacionados ao instagram')
         .setFooter({
@@ -33,4 +34,4 @@ async function execute(interaction, embedResponse) {
     interaction.channel.send({ embeds: [embedResponse] })
 }
 
-module.exports = {execute}
+module.exports = { execute }

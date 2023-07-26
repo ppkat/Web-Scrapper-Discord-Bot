@@ -24,16 +24,6 @@ module.exports = {
                 console.log(err)
                 await interaction.editReply({ content: 'Houve um erro ao executar o comando', ephemeral: true })
             }
-        }else if (interaction.isSelectMenu()){
-            const info = require('../commands/subcommands/instagram/info')
-            if(interaction.customId === 'userOptions'){
-                await interaction.deferUpdate()
-
-                await info.createEmbed(interaction.values.toString()).then(async embed => {
-                    await interaction.editReply({ content: 'Aqui as informações de ' + interaction.values.toString(), components: []})
-                    await interaction.channel.send({ embeds: [embed] })
-                })
-            }
         }
     }
 }

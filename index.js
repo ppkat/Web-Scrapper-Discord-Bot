@@ -1,11 +1,9 @@
 const { Client, Intents} = require('discord.js')
-const { REST } = require('@discordjs/rest');
-const { Routes } = require('discord-api-types/v9');
 const fs = require('fs')
 require('dotenv').config()
 
 //discord client instance
-const client = new Client( {intents: [Intents.FLAGS.GUILDS] })
+const client = new Client( {intents: [32767] })
 
 //event handling
 const eventFiles = fs.readdirSync('./events').filter(file => file.endsWith('.js'))

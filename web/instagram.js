@@ -1,7 +1,7 @@
-const puppeteer = require('puppeteer')
-const instagram = require('user-instagram');
-const ig = require('instagram-scraping')
-const fs = require('fs')
+const puppeteer = require('puppeteer');
+const { authenticate, getUserData } = require('user-instagram');
+const { readFileSync, writeFileSync } = require('fs');
+const { request } = require('axios');
 require('dotenv').config()
 
 let websocketURL = ''
@@ -9,16 +9,24 @@ let isLoggedIn;
 
 async function createBrowserInstance() {
 
-    const browser = await puppeteer.launch({ headless: false });
+    const browser = await puppeteer.launch({
+        headless: false,
+        product: 'chrome',
+        channel: 'chrome' //within this, the browser executed is chromium, whose for some reason sites have different applications
+    });
     websocketURL = browser.wsEndpoint()
 }
 
 async function loginInstagram(email, password, page) {
-    await page.waitForSelector('[name="username"]');
-    await page.type('[name="username"]', email);
-    await page.type('[type="password"]', password);
-    await page.click('[type="submit"]');
-    await page.waitForNavigation();
+    await page.waitForSelector('[name="username"]')
+    await page.type('[name="username"]', email)
+    await page.type('[type="password"]', password)
+    await page.click('[type="submit"]')
+    await page.waitForNavigation()
+
+    const dontSaveInformationButton = await page.waitForSelector('[role=button]') //the only element with this property in this page.
+    await dontSaveInformationButton.click()
+    await page.waitForNavigation()
 }
 
 async function webScrapInstagram(func) {
@@ -28,7 +36,7 @@ async function webScrapInstagram(func) {
     }
 
     const browser = await puppeteer.connect({ browserWSEndpoint: websocketURL })
-    const page = await browser.newPage()
+    const page = (await browser.pages())[0]
     page.on('console', msg => console.log('browser console: ', msg.text()))
     await page.goto('https://www.instagram.com/');
 
@@ -37,13 +45,13 @@ async function webScrapInstagram(func) {
         isLoggedIn = true
     }
     await page.reload()
+    await page.waitForTimeout(200)
 
     async function checkIfUserExists(user) {
         let returned = await page.goto(`https://www.instagram.com/${user}`).then(async res => {
             await page.waitForSelector('body')
-            const errorBody = await page.$('.p-error.dialog-404')
-            if (res.status() === 404 || errorBody) return false
-
+            const isError = await page.$('[style="line-height: var(--base-line-clamp-line-height); --base-line-clamp-line-height: 30px;"]')
+            if (isError) return false
             return true
         })
         await page.goBack()
@@ -54,19 +62,20 @@ async function webScrapInstagram(func) {
 
         await page.waitForSelector('[aria-label="Entrada da pesquisa"]')
         await page.type('[aria-label="Entrada da pesquisa"]', user)
-        await page.waitForSelector('.fuqBx') //div that contain the search results
+        await page.waitForFunction(() => !document.querySelector('._abo0'), { polling: 'mutation' })
 
-        const noResultsDiv = await page.$('._1fBIg')
+        const noResultsDiv = await page.$('._abnv')
         if (noResultsDiv) return 'Invalid Username'
 
-        await page.waitForSelector('.-qQT3') //<a> tags with the user profiles links on search bar
-        const possibleUsersNames = await page.$$eval('.-qQT3', searchedResults => {
+        await page.waitForSelector('[role="none"] a[href]') //<a> tags with the user profiles links on search bar
+        const possibleUsersNames = await page.$$eval('[role="none"] a[href]', searchedResults => {
 
             const usersList = searchedResults.filter(item => !item.href.includes('/explore/'))
-            const possibleUsers = usersList.filter((item, i) => i <= 10)
-            return possibleUsers.map(item => item.firstChild.children[1].firstChild.firstChild.firstChild.firstChild.innerHTML)
+            const possibleUsers = usersList.filter((item, i) => i <= 10) //get only the first 10 users
+            return possibleUsers.map(item => item.firstChild.children[1].firstChild.firstChild.firstChild.firstChild.textContent)
 
         })
+        console.log('1', possibleUsersNames)
         return possibleUsersNames
     }
 
@@ -77,20 +86,19 @@ async function webScrapInstagram(func) {
         let images = []
         let postURL = []
 
-        await page.waitForSelector('[href="/explore/"]')
-        await page.click('[href="/explore/"]')
+        await page.goto('https://www.instagram.com/explore/')
 
-        await page.waitForSelector('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
+        await page.waitForSelector('._aagw')
         await page.waitForTimeout(200) //load posts
 
-        let postsJSHandle = await page.$$('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
+        let postsJSHandle = await page.$$('._aagw')
 
         async function getImagesSlides(postIndex) {
 
-            postsJSHandle = await page.$$('div.QzzMF.Igw0E.IwRSH.eGOV_._4EzTm.NUiEW')
+            postsJSHandle = await page.$$('._aagw')
             let post = postsJSHandle[postIndex]
 
-            await page.evaluateHandle(post => post.firstChild.click(), post) //click on the <a> tag
+            await page.evaluateHandle(post => post.click(), post)
             let postURL = page.url()
             await page.waitForSelector('button[aria-label="Avançar"]')
 
@@ -100,7 +108,7 @@ async function webScrapInstagram(func) {
 
             for (i = 0; advanceButtonHandle; i++) {
 
-                postImageCollectionURLs.push(await page.$$eval('li.Ckrof', async (imageSlides, i) => {
+                postImageCollectionURLs.push(await page.$$eval('li._acaz', async (imageSlides, i) => {
                     const currentImgTagSrc = imageSlides[i == 0 ? 0 : 1].firstChild.firstChild.firstChild.firstChild.firstChild.src ??
                         imageSlides[i == 0 ? 0 : 1].firstChild.firstChild.firstChild.firstChild.firstChild.firstChild.src
 
@@ -114,7 +122,7 @@ async function webScrapInstagram(func) {
                 await page.waitForTimeout(200)
             }
 
-            postImageCollectionURLs.push(await page.$$eval('li.Ckrof', async imageSlides => {
+            postImageCollectionURLs.push(await page.$$eval('li._acaz', async imageSlides => {
                 const currentImgTagSrc = imageSlides[1].firstChild.firstChild.firstChild.firstChild.firstChild.src ??
                     imageSlides[1].firstChild.firstChild.firstChild.firstChild.firstChild.firstChild.src
 
@@ -132,7 +140,7 @@ async function webScrapInstagram(func) {
             const postHandle = postsJSHandle[i]
 
             const isImageCollection = await page.evaluate(post => {
-                return post.firstChild.children[1] ? (post.firstChild.children[1].firstChild.ariaLabel === 'Carrossel' ? true : false) : false
+                return post.parentElement.parentElement.children[1] ? (post.parentElement.parentElement.children[1].firstChild.ariaLabel === 'Carrossel' ? true : false) : false
             }, postHandle)
 
             if (isImageCollection) {
@@ -142,8 +150,8 @@ async function webScrapInstagram(func) {
                 })
             }
             else {
-                postURL.push(await page.evaluate(post => post.firstChild.href, postHandle))
-                images.push(await page.evaluate(post => post.firstChild.firstChild.firstChild.firstChild.src, postHandle))
+                postURL.push(await page.evaluate(post => post.parentElement.parentElement.href, postHandle))
+                images.push(await page.evaluate(post => post.previousSibling.firstChild.src, postHandle))
             }
 
         }
@@ -158,9 +166,9 @@ async function webScrapInstagram(func) {
 async function getUserInstagramInfo(user) {
 
     //login
-    await instagram.authenticate(process.env.LOGIN_EMAIL_INSTAGRAM, process.env.LOGIN_PASSWORD_INSTAGRAM)
+    await authenticate(process.env.LOGIN_EMAIL_INSTAGRAM, process.env.LOGIN_PASSWORD_INSTAGRAM)
 
-    const userData = instagram.getUserData(user).then(data => {
+    const userData = getUserData(user).then(data => {
         return {
             username: data.getUsername(),
             biography: data.getBiography(),
@@ -193,9 +201,9 @@ async function getUserInstagramInfo(user) {
 
 async function getFollowers(user, quantity) {
     if (websocketURL === '') await createBrowserInstance()
-    const browser = await puppeteer.launch({headless: false}) //unfortunally, on login on instagram in one tab, unlog in other. Then it needs other browser
+    const browser = await puppeteer.launch({ headless: false }) //unfortunally, on login on instagram in one tab, unlog in other. Then it needs other browser
 
-    const JSONAccountsPath = './accounts.json'
+    const JSONAccountsPath = 'web/accounts.json'
 
     const gmailPage = await browser.newPage()
     await gmailPage.goto('https://accounts.google.com/signin')
@@ -208,21 +216,36 @@ async function getFollowers(user, quantity) {
     await gmailPage.keyboard.press('Enter')
     await gmailPage.waitForNavigation()
 
-    function storeOnJSON(newData){
+    function storeOnJSON(newData) {
 
-        const oldData = fs.readFileSync(JSONAccountsPath)
+        const oldData = readFileSync(JSONAccountsPath)
         const objectOldData = JSON.parse(oldData)
 
         const updatadeData = [...objectOldData, ...newData]
         const stringUpdatadeData = JSON.stringify(updatadeData)
-        fs.writeFileSync(JSONAccountsPath, stringUpdatadeData)
+        writeFileSync(JSONAccountsPath, stringUpdatadeData)
     }
 
     async function createAccount(username, page, index) {
 
+        const options = {
+            method: 'GET',
+            url: 'https://privatix-temp-mail-v1.p.rapidapi.com/request/delete/id/%7Bmail_id%7D/',
+            headers: {
+                'X-RapidAPI-Host': 'privatix-temp-mail-v1.p.rapidapi.com',
+                'X-RapidAPI-Key': '370ba184aemsh9e91fcb7da2435cp17fb8ajsn78e64cb36dc1'
+            }
+        };
+
+        request(options).then(function (response) {
+            console.log(response.data);
+        }).catch(function (error) {
+            console.error(error);
+        })
+
         const password = process.env.LOGIN_PASSWORD_INSTAGRAM + index.toString()
         const fullName = `${username.slice(0, 4)} ${username.slice(5)}`
-        const email = `${process.env.GMAIL_ACCOUNT.slice(0,-11)}+bot${index}${process.env.GMAIL_ACCOUNT.slice(-10)}`
+        const email = `${process.env.GMAIL_ACCOUNT.slice(0, -11)}+bot${index}${process.env.GMAIL_ACCOUNT.slice(-10)}`
         await page.goto('https://www.instagram.com/accounts/emailsignup/')
         await page.waitForSelector('[name="emailOrPhone"]')
         await page.type('[name="emailOrPhone"]', email)
@@ -230,17 +253,16 @@ async function getFollowers(user, quantity) {
         await page.type('[name="username"]', username)
         await page.type('[name="password"]', password)
         await page.click('[type="submit"]')
-        await page.waitForNavigation()
 
-        storeOnJSON({username, id: index.toString()})
+        storeOnJSON({ username, id: index.toString() })
     }
 
-    for (i = 0; i < quantity; i++){
+    for (i = 0; i < quantity; i++) {
 
         const instagramPage = await browser.newPage()
         await instagramPage.goto(`https://www.instagram.com/${user}`);
-        
-        const accountJSON = fs.readFileSync(JSONAccountsPath)
+
+        const accountJSON = readFileSync(JSONAccountsPath)
         const createdAccounts = JSON.parse(accountJSON)
         const lastAccountIndex = createdAccounts.length - 1
         i = lastAccountIndex + 1
@@ -252,7 +274,7 @@ async function getFollowers(user, quantity) {
     }
 }
 
-getFollowers('abcdef', 6)
+//getFollowers('abcdef', 6)
 
 module.exports = {
     puppInstagram: webScrapInstagram,
